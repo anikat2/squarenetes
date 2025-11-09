@@ -1,0 +1,80 @@
+---
+# ServiceAccount for the backend
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: squarenetes-sa
+  namespace: default
+
+---
+# Role with permissions to create jobs and read pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: squarenetes-role
+  namespace: default
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch", "delete"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Bind the role to the service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: squarenetes-rolebinding
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: squarenetes-sa
+  namespace: default
+roleRef:
+  kind: Role
+  name: squarenetes-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squarenetes-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squarenetes-backend
+  template:
+    metadata:
+      labels:
+        app: squarenetes-backend
+    spec:
+      serviceAccountName: squarenetes-sa
+      containers:
+      - name: squarenetes-backend
+        image: squarenetes-backend:latest
+        imagePullPolicy: Never 
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: squarenetes-service
+spec:
+  type: NodePort
+  selector:
+    app: squarenetes-backend
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30007
